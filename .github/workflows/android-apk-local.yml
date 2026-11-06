@@ -17,6 +17,11 @@ jobs:
     name: Gerar APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      # Configure em Settings > Secrets and variables > Actions > Variables.
+      # Sem elas, o build usa os IDs de teste do AdMob.
+      ADMOB_ANDROID_APP_ID: ${{ vars.ADMOB_ANDROID_APP_ID }}
+      EXPO_PUBLIC_ADMOB_INTERSTITIAL_ANDROID: ${{ vars.ADMOB_INTERSTITIAL_ANDROID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -21,12 +21,27 @@ npm install
 npx expo start
 ```
 
-Abra o QR code no Expo Go (Android).
+Abra o QR code no Expo Go (Android). Os anúncios só funcionam no APK ou em um development build.
 
 ## APK
 
 - **Build local (GitHub Actions):** o workflow `Android APK (build local)` roda a cada push na `main` e publica o artefato `cobrinha-apk`. O APK sai assinado com a chave debug do template, então serve para instalar e testar.
 - **EAS Build:** workflow `EAS Build (Android)` (manual). Requer o secret `EXPO_TOKEN` no repositório.
+
+## Anúncios (AdMob)
+
+Anúncio intersticial ao reiniciar depois de perder, no máximo a cada 3 partidas e com intervalo mínimo de 90 s. Nunca aparece no meio do jogo.
+
+Por padrão o app usa os **IDs de teste** do Google. Para usar os seus, crie as variáveis em *Settings > Secrets and variables > Actions > Variables*:
+
+| Variável | Valor |
+| --- | --- |
+| `ADMOB_ANDROID_APP_ID` | App ID do Android (`ca-app-pub-...~...`) |
+| `ADMOB_INTERSTITIAL_ANDROID` | ID do bloco de anúncio intersticial (`ca-app-pub-.../...`) |
+
+Localmente, use `ADMOB_ANDROID_APP_ID` e `EXPO_PUBLIC_ADMOB_INTERSTITIAL_ANDROID` no ambiente. O módulo é nativo: não funciona no Expo Go (o jogo roda normal, só sem anúncios); use o APK ou um development build.
+
+Não clique nos seus próprios anúncios reais para testar: isso pode suspender a conta do AdMob.
 
 ## Identidade visual
 
