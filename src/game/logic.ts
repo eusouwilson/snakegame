@@ -2,11 +2,25 @@ export type Point = { x: number; y: number };
 export type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 export type Status = 'ready' | 'running' | 'paused' | 'over';
 
-/** lento: jogo mais devagar | double: cada comida vale 2 | ghost: atravessa as paredes */
-export type PowerUpType = 'slow' | 'double' | 'ghost';
+/**
+ * Efeitos com tempo:
+ *  slow   jogo mais devagar
+ *  double cada comida vale 2
+ *  ghost  atravessa as paredes
+ *  magnet puxa a comida para a cobra
+ */
+export type TimedEffectType = 'slow' | 'double' | 'ghost' | 'magnet';
+
+/**
+ * Todos os itens que aparecem no tabuleiro. Alem dos efeitos com tempo:
+ *  shield aguenta uma batida (desvia sozinho e some)
+ *  shrink encolhe a cobra pela metade (minimo 3)
+ *  bonus  +5 pontos na hora
+ */
+export type PowerUpType = TimedEffectType | 'shield' | 'shrink' | 'bonus';
 
 export type PowerUp = { type: PowerUpType; pos: Point; ticksLeft: number };
-export type ActiveEffect = { type: PowerUpType; ticksLeft: number };
+export type ActiveEffect = { type: TimedEffectType; ticksLeft: number };
 
 export type GameState = {
   cols: number;
@@ -17,18 +31,32 @@ export type GameState = {
   score: number;
   status: Status;
   powerUp: PowerUp | null; // item no tabuleiro esperando ser pego
-  active: ActiveEffect | null; // efeito em andamento
+  active: ActiveEffect | null; // efeito com tempo em andamento
+  shield: boolean; // escudo guardado (dura ate ser usado)
   nextPowerAt: number; // pontuacao em que aparece o proximo item
+  lastPick: { type: PowerUpType; n: number } | null; // ultimo item pego (para avisos na tela)
 };
 
-export const POWER_UP_TYPES: PowerUpType[] = ['slow', 'double', 'ghost'];
+export const POWER_UP_TYPES: PowerUpType[] = [
+  'slow',
+  'double',
+  'ghost',
+  'magnet',
+  'shield',
+  'shrink',
+  'bonus',
+];
 export const POWER_UP_EVERY = 10; // um item a cada 10 pontos
 export const POWER_UP_LIFETIME = 60; // passos que o item fica no tabuleiro
-export const EFFECT_DURATION: Record<PowerUpType, number> = {
+export const EFFECT_DURATION: Record<TimedEffectType, number> = {
   slow: 40,
   double: 60,
   ghost: 55,
+  magnet: 50,
 };
+export const BONUS_POINTS = 5;
+export const MIN_SNAKE_LENGTH = 3;
+export const MAGNET_RANGE = 7; // distancia (em casas) em que o ima puxa a comida
 const SLOW_FACTOR = 1.7;
 
 const VECTORS: Record<Direction, Point> = {
@@ -43,6 +71,13 @@ const OPPOSITE: Record<Direction, Direction> = {
   DOWN: 'UP',
   LEFT: 'RIGHT',
   RIGHT: 'LEFT',
+};
+
+const PERPENDICULAR: Record<Direction, [Direction, Direction]> = {
+  UP: ['LEFT', 'RIGHT'],
+  DOWN: ['LEFT', 'RIGHT'],
+  LEFT: ['UP', 'DOWN'],
+  RIGHT: ['UP', 'DOWN'],
 };
 
 export function isOpposite(a: Direction, b: Direction): boolean {
@@ -101,7 +136,9 @@ export function createInitialState(cols: number, rows: number): GameState {
     status: 'ready',
     powerUp: null,
     active: null,
+    shield: false,
     nextPowerAt: POWER_UP_EVERY,
+    lastPick: null,
   };
 }
 
@@ -109,37 +146,113 @@ export type StepResult = {
   state: GameState;
   ate: boolean;
   picked: PowerUpType | null;
+  shieldUsed: boolean;
 };
+
+const isOutside = (p: Point, cols: number, rows: number) =>
+  p.x < 0 || p.y < 0 || p.x >= cols || p.y >= rows;
+
+const wrap = (p: Point, cols: number, rows: number): Point => ({
+  x: (p.x + cols) % cols,
+  y: (p.y + rows) % rows,
+});
+
+/** Ima: a comida anda uma casa em direcao a proxima posicao da cabeca. */
+function pullFood(food: Point, target: Point, state: GameState): Point {
+  const dx = target.x - food.x;
+  const dy = target.y - food.y;
+  if (dx === 0 && dy === 0) return food;
+  if (Math.abs(dx) + Math.abs(dy) > MAGNET_RANGE) return food;
+
+  const options: Point[] = [];
+  const stepX: Point = { x: food.x + Math.sign(dx), y: food.y };
+  const stepY: Point = { x: food.x, y: food.y + Math.sign(dy) };
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    if (dx !== 0) options.push(stepX);
+    if (dy !== 0) options.push(stepY);
+  } else {
+    if (dy !== 0) options.push(stepY);
+    if (dx !== 0) options.push(stepX);
+  }
+  for (const c of options) {
+    // a casa da proxima cabeca vale (a comida e "comida" ali); o resto nao pode ter cobra/item
+    const blockedBySnake = !same(c, target) && state.snake.some((s) => same(s, c));
+    const blockedByItem = state.powerUp !== null && same(state.powerUp.pos, c);
+    if (!blockedBySnake && !blockedByItem) return c;
+  }
+  return food;
+}
+
+/** Escudo: escolhe uma direcao livre, preferindo virar para os lados. */
+function safeDirection(
+  state: GameState,
+  current: Direction,
+  ghost: boolean,
+): { dir: Direction; next: Point } | null {
+  const head = state.snake[0];
+  const body = state.snake.slice(0, -1); // a cauda sai do lugar
+  const sides = [...PERPENDICULAR[current]];
+  if (Math.random() < 0.5) sides.reverse();
+  for (const d of sides) {
+    let n: Point = { x: head.x + VECTORS[d].x, y: head.y + VECTORS[d].y };
+    if (isOutside(n, state.cols, state.rows)) {
+      if (!ghost) continue;
+      n = wrap(n, state.cols, state.rows);
+    }
+    if (!body.some((p) => same(p, n))) return { dir: d, next: n };
+  }
+  return null;
+}
 
 /** Avanca o jogo um passo na direcao informada. */
 export function step(state: GameState, direction: Direction): StepResult {
-  const v = VECTORS[direction];
+  let dir = direction;
   const head = state.snake[0];
-  let next: Point = { x: head.x + v.x, y: head.y + v.y };
+  let next: Point = { x: head.x + VECTORS[dir].x, y: head.y + VECTORS[dir].y };
 
   const ghost = state.active?.type === 'ghost';
-  const outside = next.x < 0 || next.y < 0 || next.x >= state.cols || next.y >= state.rows;
-  if (outside && ghost) {
-    // fantasma: reaparece do outro lado do tabuleiro
-    next = {
-      x: (next.x + state.cols) % state.cols,
-      y: (next.y + state.rows) % state.rows,
-    };
-  }
-  const hitWall = outside && !ghost;
-  const ate = same(next, state.food);
+  const outside = isOutside(next, state.cols, state.rows);
+  if (outside && ghost) next = wrap(next, state.cols, state.rows); // reaparece do outro lado
+  let hitWall = outside && !ghost;
 
+  // Ima: a comida vem em direcao a cabeca
+  let food = state.food;
+  if (state.active?.type === 'magnet' && food.x !== -1) {
+    food = pullFood(food, next, state);
+  }
+
+  let ate = same(next, food);
   // A cauda sai do lugar neste passo, a menos que a cobra coma
-  const body = ate ? state.snake : state.snake.slice(0, -1);
-  const hitSelf = body.some((p) => same(p, next));
+  let body = ate ? state.snake : state.snake.slice(0, -1);
+  let hitSelf = body.some((p) => same(p, next));
+
+  let shield = state.shield;
+  let shieldUsed = false;
+  if ((hitWall || hitSelf) && shield) {
+    const alt = safeDirection(state, dir, ghost);
+    if (alt) {
+      shield = false;
+      shieldUsed = true;
+      dir = alt.dir;
+      next = alt.next;
+      hitWall = false;
+      hitSelf = false;
+      ate = same(next, food);
+      body = ate ? state.snake : state.snake.slice(0, -1);
+    }
+  }
 
   if (hitWall || hitSelf) {
-    return { state: { ...state, direction, status: 'over' }, ate: false, picked: null };
+    return {
+      state: { ...state, direction: dir, status: 'over' },
+      ate: false,
+      picked: null,
+      shieldUsed: false,
+    };
   }
 
-  const snake = [next, ...body];
-  const points = ate ? (state.active?.type === 'double' ? 2 : 1) : 0;
-  const score = state.score + points;
+  let snake = [next, ...body];
+  let score = state.score + (ate ? (state.active?.type === 'double' ? 2 : 1) : 0);
 
   // Efeito em andamento: gasta um passo
   let active: ActiveEffect | null = state.active
@@ -147,22 +260,34 @@ export function step(state: GameState, direction: Direction): StepResult {
     : null;
   if (active && active.ticksLeft <= 0) active = null;
 
-  // Item no tabuleiro: pegar ativa o efeito; senao envelhece ate sumir
+  // Item no tabuleiro: pegar aplica o efeito; senao envelhece ate sumir
   let powerUp: PowerUp | null = state.powerUp
     ? { ...state.powerUp, ticksLeft: state.powerUp.ticksLeft - 1 }
     : null;
   let picked: PowerUpType | null = null;
   if (powerUp && same(powerUp.pos, next)) {
     picked = powerUp.type;
-    active = { type: picked, ticksLeft: EFFECT_DURATION[picked] };
     powerUp = null;
+    switch (picked) {
+      case 'shield':
+        shield = true;
+        break;
+      case 'shrink':
+        snake = snake.slice(0, Math.max(MIN_SNAKE_LENGTH, Math.ceil(snake.length / 2)));
+        break;
+      case 'bonus':
+        score += BONUS_POINTS;
+        break;
+      default:
+        active = { type: picked, ticksLeft: EFFECT_DURATION[picked] };
+    }
   } else if (powerUp && powerUp.ticksLeft <= 0) {
     powerUp = null;
   }
 
-  const food = ate
-    ? randomFood(state.cols, state.rows, snake, powerUp ? [powerUp.pos] : [])
-    : state.food;
+  if (ate) {
+    food = randomFood(state.cols, state.rows, snake, powerUp ? [powerUp.pos] : []);
+  }
 
   // Novo item a cada 10 pontos (nao empilha: se ainda ha um no tabuleiro, pula)
   let nextPowerAt = state.nextPowerAt;
@@ -177,16 +302,19 @@ export function step(state: GameState, direction: Direction): StepResult {
     state: {
       ...state,
       snake,
-      direction,
+      direction: dir,
       food,
       score,
       powerUp,
       active,
+      shield,
       nextPowerAt,
+      lastPick: picked ? { type: picked, n: (state.lastPick?.n ?? 0) + 1 } : state.lastPick,
       status: filled ? 'over' : state.status,
     },
     ate,
     picked,
+    shieldUsed,
   };
 }
 

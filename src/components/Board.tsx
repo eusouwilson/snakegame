@@ -9,6 +9,10 @@ export const POWER_UP_GLYPH: Record<PowerUpType, string> = {
   slow: 'L',
   double: '2',
   ghost: 'F',
+  magnet: 'M',
+  shield: 'E',
+  shrink: 'C',
+  bonus: '+',
 };
 
 type Props = {
@@ -16,12 +20,13 @@ type Props = {
   food: Point;
   powerUp: PowerUp | null;
   ghost: boolean;
+  shield: boolean;
   cols: number;
   rows: number;
   cell: number;
 };
 
-export const Board = memo(function Board({ snake, food, powerUp, ghost, cols, rows, cell }: Props) {
+export const Board = memo(function Board({ snake, food, powerUp, ghost, shield, cols, rows, cell }: Props) {
   const inset = Math.max(1, Math.round(cell * 0.06));
   // Item pisca nos ultimos passos, avisando que vai sumir
   const blinkOff = powerUp !== null && powerUp.ticksLeft <= 14 && powerUp.ticksLeft % 2 === 0;
@@ -76,6 +81,9 @@ export const Board = memo(function Board({ snake, food, powerUp, ghost, cols, ro
               borderRadius: i === 0 ? cell * 0.28 : cell * 0.12,
               backgroundColor: i === 0 ? LCD.dark : LCD.mid,
               opacity: ghost ? 0.55 : 1,
+              ...(i === 0 && shield
+                ? { borderWidth: Math.max(2, Math.round(cell * 0.14)), borderColor: THEME.food }
+                : null),
             },
           ]}
         />

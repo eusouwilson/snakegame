@@ -22,6 +22,7 @@ import {
   isOpposite,
   PowerUpType,
   step,
+  TimedEffectType,
   tickInterval,
 } from './src/game/logic';
 import { LCD, MONO, THEME } from './src/theme';
@@ -36,10 +37,22 @@ const H_MARGIN = 14; // margem lateral do console
 const BEZEL_PAD_X = 16;
 const LCD_BORDER = 4;
 
-const EFFECT_LABEL: Record<PowerUpType, string> = {
+const EFFECT_LABEL: Record<TimedEffectType, string> = {
   slow: 'LENTO',
   double: 'PONTOS x2',
   ghost: 'FANTASMA',
+  magnet: 'IMA',
+};
+
+// Aviso curto ao pegar cada item
+const PICK_LABEL: Record<PowerUpType, string> = {
+  slow: 'LENTO',
+  double: 'PONTOS x2',
+  ghost: 'FANTASMA',
+  magnet: 'IMA',
+  shield: 'ESCUDO PRONTO',
+  shrink: 'ENCOLHEU',
+  bonus: '+5 PONTOS',
 };
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
@@ -84,6 +97,7 @@ function Game() {
 
   const [game, setGame] = useState<GameState>(() => createInitialState(COLS, rows));
   const [highScore, setHighScore] = useState(0);
+  const [toast, setToast] = useState<string | null>(null);
 
   // Fila de direcoes evita inverter 180 graus com dois toques rapidos
   const dirQueue = useRef<Direction[]>([]);
@@ -144,8 +158,13 @@ function Game() {
         if (g.status !== 'running') return g;
         const dir = dirQueue.current.shift() ?? currentDir.current;
         currentDir.current = dir;
-        const { state, ate, picked } = step(g, dir);
-        if (picked) hapticStrong();
+        const { state, ate, picked, shieldUsed } = step(g, dir);
+        if (shieldUsed) {
+          // o escudo desviou a cobra: descarta viradas enfileiradas e sincroniza a direcao
+          dirQueue.current = [];
+          currentDir.current = state.direction;
+          hapticStrong();
+        } else if (picked) hapticStrong();
         else if (ate) haptic();
         if (state.status === 'over') {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
@@ -155,6 +174,25 @@ function Game() {
     }, tickInterval(game.score, slow));
     return () => clearInterval(id);
   }, [game.status, game.score, slow]);
+
+  // Avisos na tela: item pego e escudo gasto
+  useEffect(() => {
+    if (!game.lastPick) return;
+    setToast(PICK_LABEL[game.lastPick.type]);
+    const id = setTimeout(() => setToast(null), 1300);
+    return () => clearTimeout(id);
+  }, [game.lastPick]);
+
+  const hadShield = useRef(false);
+  useEffect(() => {
+    if (hadShield.current && !game.shield && game.status === 'running') {
+      setToast('ESCUDO USADO');
+      const id = setTimeout(() => setToast(null), 1300);
+      hadShield.current = game.shield;
+      return () => clearTimeout(id);
+    }
+    hadShield.current = game.shield;
+  }, [game.shield, game.status]);
 
   // Salva recorde ao terminar
   useEffect(() => {
@@ -239,10 +277,23 @@ function Game() {
               food={game.food}
               powerUp={game.powerUp}
               ghost={ghost}
+              shield={game.shield}
               cols={COLS}
               rows={rows}
               cell={cell}
             />
+
+            {toast && game.status === 'running' && (
+              <View style={styles.toast} pointerEvents="none">
+                <Text style={styles.badgeText}>{toast}</Text>
+              </View>
+            )}
+
+            {game.shield && game.status !== 'over' && (
+              <View style={styles.shieldChip} pointerEvents="none">
+                <Text style={styles.badgeText}>ESCUDO</Text>
+              </View>
+            )}
 
             {game.active && game.status !== 'over' && (
               <View style={styles.badge} pointerEvents="none">
@@ -406,6 +457,24 @@ const styles = StyleSheet.create({
   badgeFill: {
     height: 4,
     backgroundColor: LCD.pale,
+  },
+  toast: {
+    position: 'absolute',
+    bottom: 8,
+    alignSelf: 'center',
+    backgroundColor: LCD.dark,
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  shieldChip: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: LCD.dark,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
   brand: {
     marginTop: 10,

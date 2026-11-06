@@ -14,13 +14,17 @@ Jogo da cobrinha para Android feito com Expo (React Native + TypeScript), com vi
 
 ## Power-ups
 
-A cada 10 pontos aparece um item no tabuleiro (um quadrado escuro com uma letra). Ele some sozinho depois de alguns segundos, piscando antes de sumir. Pegar o item ativa um efeito por tempo limitado, mostrado em uma barra no topo do LCD:
+A cada 10 pontos aparece um item no tabuleiro (um quadrado escuro com uma letra). Ele some sozinho depois de alguns segundos, piscando antes de sumir. Pegar o item aplica o efeito. Os que duram um tempo (L, 2, F, M) aparecem em uma barra no topo do LCD:
 
 | Item | Efeito |
 | --- | --- |
 | **L** (lento) | O jogo fica mais devagar |
 | **2** (pontos x2) | Cada comida vale 2 pontos |
 | **F** (fantasma) | Atravessa as paredes e reaparece do outro lado (a cobra fica translúcida) |
+| **M** (ímã) | A comida por perto vem na direção da cobra por um tempo |
+| **E** (escudo) | Guarda uma proteção: na próxima batida (parede ou corpo) a cobra desvia sozinha e o escudo some. A cabeça fica com borda vermelha enquanto ele estiver ativo |
+| **C** (encolher) | Corta o corpo pela metade (mínimo de 3 casas) |
+| **+** (bônus) | Ganha 5 pontos na hora |
 
 O efeito do fantasma não atravessa o próprio corpo.
 
