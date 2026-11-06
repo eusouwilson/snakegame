@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "Cobrinha",
-    "slug": "snake-game",
+    "slug": "snakegamer",
+    "owner": "wilsoncx",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -22,6 +23,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "8b4b8d12-91ae-44c3-9701-0b1595cae53d"
+      }
     }
   }
 }
