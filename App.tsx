@@ -24,7 +24,6 @@ import {
   step,
   tickInterval,
 } from './src/game/logic';
-import { initAds, registerGameOver, showInterstitialIfDue } from './src/ads/interstitial';
 import { LCD, MONO, THEME } from './src/theme';
 
 const COLS = 16;
@@ -100,38 +99,12 @@ function Game() {
       .catch(() => {});
   }, []);
 
-  const beginGame = useCallback(() => {
+  const startGame = useCallback(() => {
     const fresh = createInitialState(COLS, rows);
     dirQueue.current = [];
     currentDir.current = fresh.direction;
     setGame({ ...fresh, status: 'running' });
   }, [rows]);
-
-  // Reiniciar depois de perder pode mostrar um anuncio (a cada algumas partidas)
-  const adBusy = useRef(false);
-  const startGame = useCallback(() => {
-    if (adBusy.current) return;
-    if (statusRef.current !== 'over') {
-      beginGame();
-      return;
-    }
-    adBusy.current = true;
-    showInterstitialIfDue()
-      .catch(() => {})
-      .then(() => {
-        adBusy.current = false;
-        beginGame();
-      });
-  }, [beginGame]);
-
-  useEffect(() => {
-    initAds().catch(() => {});
-  }, []);
-
-  // Conta partidas encerradas (uma vez por derrota)
-  useEffect(() => {
-    if (game.status === 'over') registerGameOver();
-  }, [game.status]);
 
   const togglePause = useCallback(() => {
     setGame((g) => {

@@ -1,25 +1,9 @@
-// Estende o app.json. Os IDs do AdMob vem de variaveis de ambiente;
-// sem elas, usa os IDs de TESTE do Google (nunca clique em anuncios reais para testar).
-const TEST_ANDROID_APP_ID = 'ca-app-pub-3940256099942544~3347511713';
-const TEST_IOS_APP_ID = 'ca-app-pub-3940256099942544~1458002511';
-
+// Estende o app.json com configuracoes de build do Android.
 module.exports = ({ config }) => ({
   ...config,
   plugins: [
     ...(config.plugins ?? []),
-    [
-      // O template do SDK 58 liga o R8 por padrao. Com o SDK de anuncios (que traz o
-      // WorkManager), o R8 remove um construtor usado por reflexao e o app fecha ao abrir
-      // ("Failed to create an instance of androidx.work.impl.WorkDatabase").
-      'expo-build-properties',
-      { android: { enableMinifyInReleaseBuilds: false } },
-    ],
-    [
-      'react-native-google-mobile-ads',
-      {
-        androidAppId: process.env.ADMOB_ANDROID_APP_ID || TEST_ANDROID_APP_ID,
-        iosAppId: process.env.ADMOB_IOS_APP_ID || TEST_IOS_APP_ID,
-      },
-    ],
+    // Mantem o R8 desligado no release, como no build testado no S24 Ultra (Android 17).
+    ['expo-build-properties', { android: { enableMinifyInReleaseBuilds: false } }],
   ],
 });
