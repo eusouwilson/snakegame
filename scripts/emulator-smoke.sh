@@ -5,7 +5,7 @@
 set -u
 APK="$1"
 OUT="$2"
-PKG="br.com.wilson.cobrinha"
+PKG="snakegame.vistor.app.br"
 mkdir -p "$OUT"
 
 adb wait-for-device
