@@ -7,6 +7,11 @@ on:
         description: ID da execucao do build "Android APK (build local)" cujo APK sera testado
         required: true
         type: string
+      api_level:
+        description: Nivel da API do Android do emulador (34, 35, 36, 37...)
+        required: false
+        default: '34'
+        type: string
 
 permissions:
   contents: read
@@ -37,7 +42,7 @@ jobs:
       - name: Emulador e teste
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: ${{ inputs.api_level }}
           arch: x86_64
           target: google_apis
           disable-animations: true
@@ -47,6 +52,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-logs
+          name: smoke-logs-api${{ inputs.api_level }}
           path: out
           if-no-files-found: warn
