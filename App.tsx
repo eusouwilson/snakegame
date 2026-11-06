@@ -14,6 +14,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { Board } from './src/components/Board';
 import { ActionButton, DPad, Pill } from './src/components/Controls';
+import { RankingModal } from './src/components/RankingModal';
 import {
   createInitialState,
   Direction,
@@ -25,6 +26,7 @@ import {
   TimedEffectType,
   tickInterval,
 } from './src/game/logic';
+import { getNickname, RANKING_ENABLED, submitScore } from './src/ranking/ranking';
 import { LCD, MONO, THEME } from './src/theme';
 
 const COLS = 16;
@@ -98,12 +100,19 @@ function Game() {
   const [game, setGame] = useState<GameState>(() => createInitialState(COLS, rows));
   const [highScore, setHighScore] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
+  const [rankingOpen, setRankingOpen] = useState(false);
+  const [nickname, setNickname] = useState('');
+  const [sent, setSent] = useState<'idle' | 'ok' | 'fail'>('idle');
 
   // Fila de direcoes evita inverter 180 graus com dois toques rapidos
   const dirQueue = useRef<Direction[]>([]);
   const currentDir = useRef<Direction>('RIGHT');
   const statusRef = useRef(game.status);
   statusRef.current = game.status;
+
+  useEffect(() => {
+    getNickname().then(setNickname);
+  }, []);
 
   useEffect(() => {
     AsyncStorage.getItem(HIGH_SCORE_KEY)
@@ -193,6 +202,27 @@ function Game() {
     }
     hadShield.current = game.shield;
   }, [game.shield, game.status]);
+
+  // Envia a pontuacao ao ranking quando a partida termina
+  useEffect(() => {
+    if (game.status !== 'over') {
+      setSent('idle');
+      return;
+    }
+    if (!RANKING_ENABLED || !nickname || game.score <= 0) return;
+    let alive = true;
+    submitScore(game.score).then((ok) => alive && setSent(ok ? 'ok' : 'fail'));
+    return () => {
+      alive = false;
+    };
+    // nickname fora das dependencias de proposito: so envia no fim da partida
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.status]);
+
+  const openRanking = useCallback(() => {
+    setGame((g) => (g.status === 'running' ? { ...g, status: 'paused' } : g));
+    setRankingOpen(true);
+  }, []);
 
   // Salva recorde ao terminar
   useEffect(() => {
@@ -333,6 +363,17 @@ function Game() {
                     <Text style={styles.title}>FIM DE JOGO</Text>
                     <Text style={styles.hint}>PONTOS {fmt(game.score)}</Text>
                     {newRecord && <Text style={styles.hint}>NOVO RECORDE!</Text>}
+                    {RANKING_ENABLED && game.score > 0 && (
+                      <Text style={styles.hint}>
+                        {!nickname
+                          ? 'ESCOLHA UM APELIDO EM RANKING'
+                          : sent === 'ok'
+                            ? 'ENVIADO AO RANKING'
+                            : sent === 'fail'
+                              ? 'RANKING SEM CONEXAO'
+                              : 'ENVIANDO...'}
+                      </Text>
+                    )}
                     <Text style={[styles.hint, { marginTop: 8 }]}>APERTE A</Text>
                   </>
                 )}
@@ -355,10 +396,17 @@ function Game() {
         </View>
 
         <View style={styles.pills}>
+          {RANKING_ENABLED && <Pill label="RANKING" onPress={openRanking} />}
           <Pill label="SELECT" onPress={onB} />
           <Pill label="START" onPress={onA} />
         </View>
       </View>
+
+      <RankingModal
+        visible={rankingOpen}
+        onClose={() => setRankingOpen(false)}
+        onNickname={setNickname}
+      />
     </View>
   );
 }
@@ -498,6 +546,6 @@ const styles = StyleSheet.create({
     bottom: 4,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 24,
+    gap: 16,
   },
 });

@@ -47,6 +47,10 @@ jobs:
 
       - name: Build release
         working-directory: android
+        env:
+          # Ranking (opcional): secrets do repositorio. Sem eles o ranking fica desligado.
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: ./gradlew assembleRelease --no-daemon
 
       - name: Publicar APK

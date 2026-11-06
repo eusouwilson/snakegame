@@ -30,6 +30,16 @@ O efeito do fantasma não atravessa o próprio corpo.
 
 O recorde fica salvo no aparelho. O jogo pausa sozinho se o app for para segundo plano.
 
+## Ranking
+
+Ranking compartilhado (semana e geral) com Supabase, via `fetch`, sem módulo nativo. Fica desligado se as chaves não estiverem configuradas.
+
+1. Crie um projeto em supabase.com e rode `supabase/schema.sql` no SQL Editor.
+2. Local: copie `.env.example` para `.env` e preencha.
+3. CI: crie os secrets `SUPABASE_URL` e `SUPABASE_ANON_KEY` no repositório.
+
+O jogador é anônimo (id aleatório no aparelho) com apelido de até 12 caracteres. Fase 1 não valida a partida no servidor, só limita a pontuação aceita.
+
 ## Rodar
 
 ```bash
@@ -56,5 +66,7 @@ python3 scripts/generate-assets.py   # requer Pillow
 
 - `App.tsx`: tela, loop do jogo e entrada (D-pad, botões, swipe)
 - `src/game/logic.ts`: regras do jogo (funções puras)
+- `src/ranking/`: cliente do ranking (Supabase via fetch)
+- `supabase/schema.sql`: tabela, políticas e views do ranking
 - `src/components/`: tabuleiro LCD e controles do console
 - `src/theme.ts`: cores
