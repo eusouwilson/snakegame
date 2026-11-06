@@ -22,7 +22,7 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "br.com.wilson.cobrinha",
+      "package": "snakegame.vistor.app.br",
       "adaptiveIcon": {
         "backgroundColor": "#9BBC0F",
         "foregroundImage": "./assets/android-icon-foreground.png",
