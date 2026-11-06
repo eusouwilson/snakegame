@@ -8,6 +8,13 @@ module.exports = ({ config }) => ({
   plugins: [
     ...(config.plugins ?? []),
     [
+      // O template do SDK 58 liga o R8 por padrao. Com o SDK de anuncios (que traz o
+      // WorkManager), o R8 remove um construtor usado por reflexao e o app fecha ao abrir
+      // ("Failed to create an instance of androidx.work.impl.WorkDatabase").
+      'expo-build-properties',
+      { android: { enableMinifyInReleaseBuilds: false } },
+    ],
+    [
       'react-native-google-mobile-ads',
       {
         androidAppId: process.env.ADMOB_ANDROID_APP_ID || TEST_ANDROID_APP_ID,
