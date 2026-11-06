@@ -1,8 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Configure em .env (local) ou nos secrets do GitHub (CI). Sem isso o ranking fica desligado.
-const URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+// Projeto Supabase "cobrinha". A chave publishable e publica por design: quem protege
+// os dados sao as politicas RLS de supabase/schema.sql. Variaveis EXPO_PUBLIC_* sobrescrevem.
+const URL =
+  process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://npbomychwmzmddpiubav.supabase.co';
+const KEY =
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable__yNJ2fdG8Nrqmapel6PZPA_KsnEyym9';
 
 export const RANKING_ENABLED = URL.length > 0 && KEY.length > 0;
 

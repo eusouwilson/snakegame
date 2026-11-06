@@ -32,11 +32,10 @@ O recorde fica salvo no aparelho. O jogo pausa sozinho se o app for para segundo
 
 ## Ranking
 
-Ranking compartilhado (semana e geral) com Supabase, via `fetch`, sem módulo nativo. Fica desligado se as chaves não estiverem configuradas.
+Ranking compartilhado (semana e geral) com Supabase, via `fetch`, sem módulo nativo. A URL e a chave publishable do projeto `cobrinha` já estão no código (são públicas por design, a proteção está nas políticas RLS).
 
 1. Crie um projeto em supabase.com e rode `supabase/schema.sql` no SQL Editor.
-2. Local: copie `.env.example` para `.env` e preencha.
-3. CI: crie os secrets `SUPABASE_URL` e `SUPABASE_ANON_KEY` no repositório.
+2. Para usar outro projeto, defina `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_ANON_KEY` (`.env` local ou secrets `SUPABASE_URL` e `SUPABASE_ANON_KEY` no CI).
 
 O jogador é anônimo (id aleatório no aparelho) com apelido de até 12 caracteres. Fase 1 não valida a partida no servidor, só limita a pontuação aceita.
 
