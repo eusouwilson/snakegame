@@ -75,9 +75,10 @@ const ARM_LABEL: Record<Direction, string> = {
   RIGHT: 'Direita',
 };
 
+/** D-pad circular: disco escuro com quatro setas */
 export function DPad({ size, onPress }: { size: number; onPress: (dir: Direction) => void }) {
   const t = Math.round(size / 3);
-  const arrow = Math.max(5, Math.round(t * 0.2));
+  const arrow = Math.max(5, Math.round(t * 0.18));
   const arms: { dir: Direction; left: number; top: number }[] = [
     { dir: 'UP', left: t, top: 0 },
     { dir: 'DOWN', left: t, top: t * 2 },
@@ -87,17 +88,28 @@ export function DPad({ size, onPress }: { size: number; onPress: (dir: Direction
 
   return (
     <View style={{ width: size, height: size }}>
-      <View style={[styles.bar, { left: 0, top: t, width: size, height: t }]} />
-      <View style={[styles.bar, { left: t, top: 0, width: t, height: size }]} />
       <View
         style={{
           position: 'absolute',
-          left: t * 1.2,
-          top: t * 1.2,
-          width: t * 0.6,
-          height: t * 0.6,
-          borderRadius: t * 0.3,
+          left: 0,
+          top: 0,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: THEME.dpad,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          left: t * 1.1,
+          top: t * 1.1,
+          width: t * 0.8,
+          height: t * 0.8,
+          borderRadius: t * 0.4,
           backgroundColor: THEME.dpadCenter,
+          borderWidth: 2,
+          borderColor: THEME.dpadHi,
         }}
       />
       {arms.map((a) => (
@@ -120,7 +132,8 @@ export function DPad({ size, onPress }: { size: number; onPress: (dir: Direction
   );
 }
 
-export function RoundButton({
+/** Botao de acao quadrado arredondado (A e B) */
+export function ActionButton({
   label,
   size,
   onPress,
@@ -140,7 +153,7 @@ export function RoundButton({
           {
             width: size,
             height: size,
-            borderRadius: size / 2,
+            borderRadius: size * 0.3,
             backgroundColor: pressed ? THEME.buttonShade : THEME.button,
             borderBottomWidth: pressed ? 0 : 4,
             borderBottomColor: THEME.buttonShade,
@@ -153,6 +166,7 @@ export function RoundButton({
   );
 }
 
+/** START / SELECT: pilulas retas, so com contorno */
 export function Pill({ label, onPress }: { label: string; onPress: () => void }) {
   return (
     <View style={styles.labelBox}>
@@ -161,35 +175,19 @@ export function Pill({ label, onPress }: { label: string; onPress: () => void })
         accessibilityLabel={label}
         onPressIn={onPress}
         hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-        style={({ pressed }) => [styles.pill, pressed && { backgroundColor: THEME.bezel }]}
+        style={({ pressed }) => [styles.pill, pressed && { backgroundColor: THEME.pill }]}
       />
       <Text style={styles.pillLabel}>{label}</Text>
     </View>
   );
 }
 
-/** Grade do alto-falante (decorativa) */
-export function Speaker() {
-  return (
-    <View style={styles.speaker} pointerEvents="none">
-      {[0, 1, 2, 3, 4].map((i) => (
-        <View key={i} style={styles.speakerBar} />
-      ))}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  bar: {
-    position: 'absolute',
-    backgroundColor: THEME.dpad,
-    borderRadius: 6,
-  },
   arm: {
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 6,
+    borderRadius: 999,
   },
   labelBox: { alignItems: 'center' },
   btnLabel: {
@@ -201,9 +199,11 @@ const styles = StyleSheet.create({
   },
   pill: {
     width: 46,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: THEME.pill,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: THEME.pill,
+    backgroundColor: 'transparent',
   },
   pillLabel: {
     marginTop: 4,
@@ -211,16 +211,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 10,
     letterSpacing: 1,
-  },
-  speaker: {
-    flexDirection: 'row',
-    gap: 6,
-    transform: [{ rotate: '-28deg' }],
-  },
-  speakerBar: {
-    width: 6,
-    height: 38,
-    borderRadius: 3,
-    backgroundColor: THEME.bodyShade,
   },
 });

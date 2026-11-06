@@ -8,22 +8,22 @@ export const LCD = {
   dark: '#0F380F',
 };
 
-/** Cores do corpo do console */
+/** Cores do corpo do console (identidade propria: verde-agua, azul-marinho e amarelo) */
 export const THEME = {
-  body: '#D8D3C4',
-  bodyShade: '#BDB8A8',
-  bezel: '#4B4A5C',
-  bezelText: '#C9C7D6',
-  lcdFrame: '#22222B',
-  button: '#D6456B',
-  buttonShade: '#A8324F',
-  dpad: '#2B2B33',
-  dpadHi: '#454552',
-  dpadArrow: '#6A6A78',
-  dpadCenter: '#22222A',
-  pill: '#8E8A7E',
-  label: '#4B4A5C',
-  brand: '#1E3A5F',
+  body: '#2A7F86',
+  bodyShade: '#226A70',
+  bezel: '#16213A',
+  bezelText: '#B8C4DD',
+  lcdFrame: '#0C1424',
+  button: '#F2B134',
+  buttonShade: '#B97F0A',
+  dpad: '#14213D',
+  dpadHi: '#2C3E66',
+  dpadArrow: '#7E90B8',
+  dpadCenter: '#0E1730',
+  pill: '#F4EBD0',
+  label: '#F4EBD0',
+  brand: '#F4EBD0',
   food: '#D6456B',
 };
 

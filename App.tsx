@@ -13,7 +13,7 @@ import {
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Board } from './src/components/Board';
-import { DPad, Pill, RoundButton, Speaker } from './src/components/Controls';
+import { ActionButton, DPad, Pill } from './src/components/Controls';
 import {
   createInitialState,
   Direction,
@@ -49,7 +49,7 @@ function Game() {
   const layout = useMemo(() => {
     const bezelW = width - H_MARGIN * 2;
     const dpadSize = Math.round(clamp(width * 0.4, 120, 156));
-    const controlsH = dpadSize + 80;
+    const controlsH = dpadSize + 56;
     const lcdMaxW = bezelW - BEZEL_PAD_X * 2 - LCD_BORDER * 2;
     const chrome =
       insets.top + 8 + insets.bottom + 10 + // margens da tela
@@ -208,7 +208,7 @@ function Game() {
     <View
       style={[styles.root, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 10 }]}
     >
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
 
       <View style={styles.top}>
         <View style={[styles.bezel, { width: layout.bezelW }]}>
@@ -255,20 +255,14 @@ function Game() {
           <DPad size={layout.dpadSize} onPress={onDirection} />
         </View>
 
-        <View style={styles.ab}>
-          <View style={{ marginTop: 14 }}>
-            <RoundButton label="B" size={btn} onPress={onB} />
-          </View>
-          <RoundButton label="A" size={btn} onPress={onA} />
+        <View style={[styles.ab, { top: 6 + (layout.dpadSize - (btn + 26)) / 2 }]}>
+          <ActionButton label="B" size={btn} onPress={onB} />
+          <ActionButton label="A" size={btn} onPress={onA} />
         </View>
 
         <View style={styles.pills}>
           <Pill label="SELECT" onPress={onB} />
           <Pill label="START" onPress={onA} />
-        </View>
-
-        <View style={{ position: 'absolute', right: 6, bottom: 6 }}>
-          <Speaker />
         </View>
       </View>
     </View>
@@ -293,8 +287,7 @@ const styles = StyleSheet.create({
   top: { alignItems: 'center' },
   bezel: {
     backgroundColor: THEME.bezel,
-    borderRadius: 14,
-    borderBottomRightRadius: 44,
+    borderRadius: 22,
     paddingHorizontal: BEZEL_PAD_X,
     paddingTop: 12,
     paddingBottom: 18,
@@ -352,20 +345,17 @@ const styles = StyleSheet.create({
   },
   ab: {
     position: 'absolute',
-    right: 8,
-    top: 26,
+    right: 10,
     flexDirection: 'row',
-    gap: 18,
-    transform: [{ rotate: '-22deg' }],
+    gap: 16,
   },
   pills: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 12,
+    bottom: 4,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 22,
-    transform: [{ rotate: '-22deg' }],
+    gap: 24,
   },
 });
