@@ -2,9 +2,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import {
+  AppState,
+  PanResponder,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Board } from './src/components/Board';
+import { DPad, Pill, RoundButton, Speaker } from './src/components/Controls';
 import {
   createInitialState,
   Direction,
@@ -13,43 +22,58 @@ import {
   step,
   tickInterval,
 } from './src/game/logic';
+import { LCD, MONO, THEME } from './src/theme';
 
 const COLS = 16;
-const ROWS = 22;
+const MIN_ROWS = 14;
+const MAX_ROWS = 26;
 const HIGH_SCORE_KEY = 'snake:highScore';
 const SWIPE_THRESHOLD = 18;
 
-const COLORS = {
-  bg: '#0F1B14',
-  board: '#16281D',
-  gridLine: '#1B3224',
-  snakeHead: '#7CFC9A',
-  snakeBody: '#3DBE63',
-  food: '#FF5C5C',
-  text: '#E8F5EC',
-  muted: '#8FB59C',
-  accent: '#3DBE63',
-};
+const H_MARGIN = 14; // margem lateral do console
+const BEZEL_PAD_X = 16;
+const LCD_BORDER = 4;
 
-function safeHaptic(fn: () => Promise<void>) {
-  fn().catch(() => {});
+const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+const fmt = (n: number) => String(n).padStart(4, '0');
+
+function haptic() {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 }
 
 function Game() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
 
-  // Tamanho da celula calculado para o tabuleiro caber na tela
-  const cell = useMemo(() => {
-    const maxW = width - 24;
-    const maxH = height - insets.top - insets.bottom - 190;
-    return Math.max(10, Math.floor(Math.min(maxW / COLS, maxH / ROWS)));
+  // Medidas do console e area disponivel para o LCD
+  const layout = useMemo(() => {
+    const bezelW = width - H_MARGIN * 2;
+    const dpadSize = Math.round(clamp(width * 0.4, 120, 156));
+    const controlsH = dpadSize + 80;
+    const lcdMaxW = bezelW - BEZEL_PAD_X * 2 - LCD_BORDER * 2;
+    const chrome =
+      insets.top + 8 + insets.bottom + 10 + // margens da tela
+      12 + 26 + 18 + LCD_BORDER * 2 + // moldura: topo, placar, base, borda do LCD
+      34 + // nome "COBRINHA"
+      controlsH;
+    const lcdMaxH = height - chrome;
+    return { bezelW, dpadSize, controlsH, lcdMaxW, lcdMaxH };
   }, [width, height, insets.top, insets.bottom]);
 
-  const [game, setGame] = useState<GameState>(() => createInitialState(COLS, ROWS));
+  // Linhas definidas uma vez (em telas altas o LCD ganha mais linhas)
+  const [rows] = useState(() => {
+    const c = Math.max(8, Math.floor(layout.lcdMaxW / COLS));
+    return clamp(Math.floor(layout.lcdMaxH / c), MIN_ROWS, MAX_ROWS);
+  });
+  const cell = Math.max(
+    8,
+    Math.floor(Math.min(layout.lcdMaxW / COLS, layout.lcdMaxH / rows)),
+  );
+
+  const [game, setGame] = useState<GameState>(() => createInitialState(COLS, rows));
   const [highScore, setHighScore] = useState(0);
 
-  // Fila de direcoes evita inverter 180 graus com dois swipes rapidos
+  // Fila de direcoes evita inverter 180 graus com dois toques rapidos
   const dirQueue = useRef<Direction[]>([]);
   const currentDir = useRef<Direction>('RIGHT');
   const statusRef = useRef(game.status);
@@ -64,11 +88,11 @@ function Game() {
   }, []);
 
   const startGame = useCallback(() => {
-    const fresh = createInitialState(COLS, ROWS);
+    const fresh = createInitialState(COLS, rows);
     dirQueue.current = [];
     currentDir.current = fresh.direction;
     setGame({ ...fresh, status: 'running' });
-  }, []);
+  }, [rows]);
 
   const togglePause = useCallback(() => {
     setGame((g) => {
@@ -87,6 +111,16 @@ function Game() {
     if (dirQueue.current.length < 2) dirQueue.current.push(dir);
   }, []);
 
+  // Pausa sozinho se o app for para segundo plano
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s !== 'active' && statusRef.current === 'running') {
+        setGame((g) => (g.status === 'running' ? { ...g, status: 'paused' } : g));
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   // Loop do jogo
   useEffect(() => {
     if (game.status !== 'running') return;
@@ -96,9 +130,9 @@ function Game() {
         const dir = dirQueue.current.shift() ?? currentDir.current;
         currentDir.current = dir;
         const { state, ate } = step(g, dir);
-        if (ate) safeHaptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
+        if (ate) haptic();
         if (state.status === 'over') {
-          safeHaptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error));
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         }
         return state;
       });
@@ -114,8 +148,31 @@ function Game() {
     }
   }, [game.status, game.score, highScore]);
 
-  // Gesto de swipe: a cada deslocamento acima do limite troca a direcao e
-  // reposiciona a ancora, permitindo varios swipes sem tirar o dedo
+  // Botoes do console
+  const onDirection = useCallback(
+    (dir: Direction) => {
+      haptic();
+      queueDirection(dir);
+    },
+    [queueDirection],
+  );
+
+  // A: jogar / pausar / continuar
+  const onA = useCallback(() => {
+    haptic();
+    const s = statusRef.current;
+    if (s === 'ready' || s === 'over') startGame();
+    else togglePause();
+  }, [startGame, togglePause]);
+
+  // B: pausa durante o jogo; fora dele, comeca uma partida nova
+  const onB = useCallback(() => {
+    haptic();
+    if (statusRef.current === 'running') togglePause();
+    else startGame();
+  }, [startGame, togglePause]);
+
+  // Swipe no LCD continua funcionando como atalho
   const anchor = useRef({ x: 0, y: 0 });
   const panResponder = useMemo(
     () =>
@@ -135,7 +192,7 @@ function Game() {
           queueDirection(dir);
         },
         onPanResponderRelease: (_e, g) => {
-          // toque curto sem movimento: inicia o jogo quando parado
+          // toque curto no LCD inicia o jogo quando parado
           if (Math.abs(g.dx) < 6 && Math.abs(g.dy) < 6) {
             if (statusRef.current === 'ready' || statusRef.current === 'over') startGame();
           }
@@ -144,94 +201,76 @@ function Game() {
     [queueDirection, startGame],
   );
 
-  const boardW = cell * COLS;
-  const boardH = cell * ROWS;
-  const overlayVisible = game.status !== 'running';
+  const btn = Math.round(clamp(width * 0.16, 52, 64));
+  const newRecord = game.status === 'over' && game.score > 0 && game.score >= highScore;
 
   return (
     <View
-      style={[styles.root, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 }]}
-      {...panResponder.panHandlers}
+      style={[styles.root, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 10 }]}
     >
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
-      <View style={styles.header}>
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>PONTOS</Text>
-          <Text style={styles.statValue}>{game.score}</Text>
-        </View>
-        <Pressable
-          onPress={togglePause}
-          disabled={game.status !== 'running' && game.status !== 'paused'}
-          style={[styles.pauseBtn, game.status === 'ready' || game.status === 'over' ? { opacity: 0.4 } : null]}
-          hitSlop={10}
-        >
-          <Text style={styles.pauseText}>{game.status === 'paused' ? 'Continuar' : 'Pausar'}</Text>
-        </Pressable>
-        <View style={[styles.stat, { alignItems: 'flex-end' }]}>
-          <Text style={styles.statLabel}>RECORDE</Text>
-          <Text style={styles.statValue}>{highScore}</Text>
-        </View>
-      </View>
+      <View style={styles.top}>
+        <View style={[styles.bezel, { width: layout.bezelW }]}>
+          <View style={styles.stats}>
+            <Text style={styles.statText}>PONTOS {fmt(game.score)}</Text>
+            <Text style={styles.statText}>RECORDE {fmt(highScore)}</Text>
+          </View>
 
-      <View style={[styles.board, { width: boardW, height: boardH }]}>
-        <View
-          style={[
-            styles.cellBox,
-            {
-              left: game.food.x * cell + cell * 0.12,
-              top: game.food.y * cell + cell * 0.12,
-              width: cell * 0.76,
-              height: cell * 0.76,
-              borderRadius: cell,
-              backgroundColor: COLORS.food,
-            },
-          ]}
-        />
-        {game.snake.map((p, i) => (
-          <View
-            key={i === 0 ? 'head' : `${i}`}
-            style={[
-              styles.cellBox,
-              {
-                left: p.x * cell + 1,
-                top: p.y * cell + 1,
-                width: cell - 2,
-                height: cell - 2,
-                borderRadius: i === 0 ? cell * 0.4 : cell * 0.28,
-                backgroundColor: i === 0 ? COLORS.snakeHead : COLORS.snakeBody,
-              },
-            ]}
-          />
-        ))}
+          <View style={styles.lcdFrame} {...panResponder.panHandlers}>
+            <Board snake={game.snake} food={game.food} cols={COLS} rows={rows} cell={cell} />
 
-        {overlayVisible && (
-          <View style={styles.overlay} pointerEvents="box-none">
-            {game.status === 'ready' && (
-              <>
-                <Text style={styles.title}>Cobrinha</Text>
-                <Text style={styles.hint}>Deslize na tela para virar</Text>
-              </>
-            )}
-            {game.status === 'paused' && <Text style={styles.title}>Pausado</Text>}
-            {game.status === 'over' && (
-              <>
-                <Text style={styles.title}>Fim de jogo</Text>
-                <Text style={styles.hint}>
-                  {game.score >= highScore && game.score > 0 ? 'Novo recorde! ' : ''}Pontos: {game.score}
-                </Text>
-              </>
-            )}
-            {(game.status === 'ready' || game.status === 'over') && (
-              <Pressable onPress={startGame} style={styles.playBtn}>
-                <Text style={styles.playText}>{game.status === 'over' ? 'Jogar de novo' : 'Jogar'}</Text>
-              </Pressable>
+            {game.status !== 'running' && (
+              <View style={styles.overlay} pointerEvents="none">
+                {game.status === 'ready' && (
+                  <>
+                    <Text style={styles.title}>COBRINHA</Text>
+                    <Text style={styles.hint}>APERTE A PARA JOGAR</Text>
+                  </>
+                )}
+                {game.status === 'paused' && (
+                  <>
+                    <Text style={styles.title}>PAUSADO</Text>
+                    <Text style={styles.hint}>A CONTINUA  |  B REINICIA</Text>
+                  </>
+                )}
+                {game.status === 'over' && (
+                  <>
+                    <Text style={styles.title}>FIM DE JOGO</Text>
+                    <Text style={styles.hint}>PONTOS {fmt(game.score)}</Text>
+                    {newRecord && <Text style={styles.hint}>NOVO RECORDE!</Text>}
+                    <Text style={[styles.hint, { marginTop: 8 }]}>APERTE A</Text>
+                  </>
+                )}
+              </View>
             )}
           </View>
-        )}
+        </View>
+
+        <Text style={styles.brand}>COBRINHA</Text>
       </View>
 
-      <Text style={styles.footer}>Deslize em qualquer lugar da tela</Text>
+      <View style={{ width: layout.bezelW, height: layout.controlsH }}>
+        <View style={{ position: 'absolute', left: 6, top: 6 }}>
+          <DPad size={layout.dpadSize} onPress={onDirection} />
+        </View>
+
+        <View style={styles.ab}>
+          <View style={{ marginTop: 14 }}>
+            <RoundButton label="B" size={btn} onPress={onB} />
+          </View>
+          <RoundButton label="A" size={btn} onPress={onA} />
+        </View>
+
+        <View style={styles.pills}>
+          <Pill label="SELECT" onPress={onB} />
+          <Pill label="START" onPress={onA} />
+        </View>
+
+        <View style={{ position: 'absolute', right: 6, bottom: 6 }}>
+          <Speaker />
+        </View>
+      </View>
     </View>
   );
 }
@@ -247,51 +286,86 @@ export default function App() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: COLORS.bg,
-    alignItems: 'center',
-  },
-  header: {
-    width: '92%',
-    flexDirection: 'row',
+    backgroundColor: THEME.body,
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
   },
-  stat: { minWidth: 80 },
-  statLabel: { color: COLORS.muted, fontSize: 11, letterSpacing: 1.2, fontWeight: '600' },
-  statValue: { color: COLORS.text, fontSize: 26, fontWeight: '800' },
-  pauseBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.accent,
+  top: { alignItems: 'center' },
+  bezel: {
+    backgroundColor: THEME.bezel,
+    borderRadius: 14,
+    borderBottomRightRadius: 44,
+    paddingHorizontal: BEZEL_PAD_X,
+    paddingTop: 12,
+    paddingBottom: 18,
   },
-  pauseText: { color: COLORS.accent, fontWeight: '700' },
-  board: {
-    backgroundColor: COLORS.board,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.gridLine,
+  stats: {
+    height: 26,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statText: {
+    color: THEME.bezelText,
+    fontFamily: MONO,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  lcdFrame: {
+    alignSelf: 'center',
+    borderWidth: LCD_BORDER,
+    borderColor: THEME.lcdFrame,
+    borderRadius: 4,
     overflow: 'hidden',
+    backgroundColor: LCD.pale,
   },
-  cellBox: { position: 'absolute' },
   overlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(15,27,20,0.82)',
+    backgroundColor: 'rgba(155,188,15,0.92)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 6,
   },
-  title: { color: COLORS.text, fontSize: 34, fontWeight: '900' },
-  hint: { color: COLORS.muted, fontSize: 16 },
-  playBtn: {
-    marginTop: 8,
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 28,
+  title: {
+    color: LCD.dark,
+    fontFamily: MONO,
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: 3,
   },
-  playText: { color: '#06220F', fontWeight: '800', fontSize: 18 },
-  footer: { color: COLORS.muted, marginTop: 12, fontSize: 12 },
+  hint: {
+    color: LCD.dark,
+    fontFamily: MONO,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  brand: {
+    marginTop: 10,
+    height: 24,
+    color: THEME.brand,
+    fontSize: 20,
+    fontWeight: '900',
+    fontStyle: 'italic',
+    letterSpacing: 3,
+  },
+  ab: {
+    position: 'absolute',
+    right: 8,
+    top: 26,
+    flexDirection: 'row',
+    gap: 18,
+    transform: [{ rotate: '-22deg' }],
+  },
+  pills: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 22,
+    transform: [{ rotate: '-22deg' }],
+  },
 });
