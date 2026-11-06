@@ -1,0 +1,34 @@
+name: Deploy site (servidor)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "deploy/**"
+      - ".github/workflows/deploy-site.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, snakegame]
+    timeout-minutes: 10
+    env:
+      DOCKER_HOST: unix:///var/run/docker.sock # o servidor usa podman-docker
+    defaults:
+      run:
+        working-directory: deploy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Subir o site
+        run: docker compose up -d --force-recreate --wait web
+      - name: Logs em caso de falha
+        if: failure()
+        run: docker compose ps -a && docker compose logs --tail 40 web

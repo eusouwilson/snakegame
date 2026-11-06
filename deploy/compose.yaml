@@ -1,0 +1,21 @@
+# Site do Cobrinha no servidor self-hosted. Projeto proprio, independente do stack do Vistor:
+# o deploy daqui nunca altera nem reinicia nada do vistor-dev.
+# Rota no Cloudflare: snakegame.vistor.app.br -> http://snakegame-web:80
+name: snakegame-site
+
+services:
+  web:
+    container_name: snakegame-web
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    volumes:
+      - ../site:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - tunnel
+
+# Rede onde o cloudflared ja roda (so entra nela, nao cria nem altera nada).
+networks:
+  tunnel:
+    name: vistor-dev_default
+    external: true
