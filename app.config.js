@@ -14,12 +14,5 @@ module.exports = ({ config }) => ({
       'expo-build-properties',
       { android: { enableMinifyInReleaseBuilds: false } },
     ],
-    [
-      'react-native-google-mobile-ads',
-      {
-        androidAppId: process.env.ADMOB_ANDROID_APP_ID || TEST_ANDROID_APP_ID,
-        iosAppId: process.env.ADMOB_IOS_APP_ID || TEST_IOS_APP_ID,
-      },
-    ],
   ],
 });
