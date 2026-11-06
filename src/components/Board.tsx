@@ -1,19 +1,31 @@
 import { memo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import type { Point } from '../game/logic';
-import { LCD, THEME } from '../theme';
+import type { Point, PowerUp, PowerUpType } from '../game/logic';
+import { LCD, MONO, THEME } from '../theme';
+
+/** Letra desenhada dentro do item de cada power-up */
+export const POWER_UP_GLYPH: Record<PowerUpType, string> = {
+  slow: 'L',
+  double: '2',
+  ghost: 'F',
+};
 
 type Props = {
   snake: Point[];
   food: Point;
+  powerUp: PowerUp | null;
+  ghost: boolean;
   cols: number;
   rows: number;
   cell: number;
 };
 
-export const Board = memo(function Board({ snake, food, cols, rows, cell }: Props) {
+export const Board = memo(function Board({ snake, food, powerUp, ghost, cols, rows, cell }: Props) {
   const inset = Math.max(1, Math.round(cell * 0.06));
+  // Item pisca nos ultimos passos, avisando que vai sumir
+  const blinkOff = powerUp !== null && powerUp.ticksLeft <= 14 && powerUp.ticksLeft % 2 === 0;
+
   return (
     <View style={{ width: cell * cols, height: cell * rows, backgroundColor: LCD.pale }}>
       <View
@@ -29,6 +41,28 @@ export const Board = memo(function Board({ snake, food, cols, rows, cell }: Prop
           },
         ]}
       />
+
+      {powerUp && (
+        <View
+          style={[
+            styles.box,
+            styles.powerUp,
+            {
+              left: powerUp.pos.x * cell + inset,
+              top: powerUp.pos.y * cell + inset,
+              width: cell - inset * 2,
+              height: cell - inset * 2,
+              borderRadius: cell * 0.22,
+              opacity: blinkOff ? 0.25 : 1,
+            },
+          ]}
+        >
+          <Text style={[styles.glyph, { fontSize: Math.round(cell * 0.62) }]}>
+            {POWER_UP_GLYPH[powerUp.type]}
+          </Text>
+        </View>
+      )}
+
       {snake.map((p, i) => (
         <View
           key={i === 0 ? 'head' : i}
@@ -41,6 +75,7 @@ export const Board = memo(function Board({ snake, food, cols, rows, cell }: Prop
               height: cell - inset * 2,
               borderRadius: i === 0 ? cell * 0.28 : cell * 0.12,
               backgroundColor: i === 0 ? LCD.dark : LCD.mid,
+              opacity: ghost ? 0.55 : 1,
             },
           ]}
         />
@@ -51,4 +86,17 @@ export const Board = memo(function Board({ snake, food, cols, rows, cell }: Prop
 
 const styles = StyleSheet.create({
   box: { position: 'absolute' },
+  powerUp: {
+    backgroundColor: LCD.dark,
+    borderWidth: 1,
+    borderColor: LCD.mid,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  glyph: {
+    color: LCD.pale,
+    fontFamily: MONO,
+    fontWeight: '900',
+    includeFontPadding: false,
+  },
 });

@@ -17,8 +17,10 @@ import { ActionButton, DPad, Pill } from './src/components/Controls';
 import {
   createInitialState,
   Direction,
+  EFFECT_DURATION,
   GameState,
   isOpposite,
+  PowerUpType,
   step,
   tickInterval,
 } from './src/game/logic';
@@ -35,11 +37,21 @@ const H_MARGIN = 14; // margem lateral do console
 const BEZEL_PAD_X = 16;
 const LCD_BORDER = 4;
 
+const EFFECT_LABEL: Record<PowerUpType, string> = {
+  slow: 'LENTO',
+  double: 'PONTOS x2',
+  ghost: 'FANTASMA',
+};
+
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 const fmt = (n: number) => String(n).padStart(4, '0');
 
 function haptic() {
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+}
+
+function hapticStrong() {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
 }
 
 function Game() {
@@ -148,6 +160,9 @@ function Game() {
     return () => sub.remove();
   }, []);
 
+  const slow = game.active?.type === 'slow';
+  const ghost = game.active?.type === 'ghost';
+
   // Loop do jogo
   useEffect(() => {
     if (game.status !== 'running') return;
@@ -156,16 +171,17 @@ function Game() {
         if (g.status !== 'running') return g;
         const dir = dirQueue.current.shift() ?? currentDir.current;
         currentDir.current = dir;
-        const { state, ate } = step(g, dir);
-        if (ate) haptic();
+        const { state, ate, picked } = step(g, dir);
+        if (picked) hapticStrong();
+        else if (ate) haptic();
         if (state.status === 'over') {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         }
         return state;
       });
-    }, tickInterval(game.score));
+    }, tickInterval(game.score, slow));
     return () => clearInterval(id);
-  }, [game.status, game.score]);
+  }, [game.status, game.score, slow]);
 
   // Salva recorde ao terminar
   useEffect(() => {
@@ -245,7 +261,34 @@ function Game() {
           </View>
 
           <View style={styles.lcdFrame} {...panResponder.panHandlers}>
-            <Board snake={game.snake} food={game.food} cols={COLS} rows={rows} cell={cell} />
+            <Board
+              snake={game.snake}
+              food={game.food}
+              powerUp={game.powerUp}
+              ghost={ghost}
+              cols={COLS}
+              rows={rows}
+              cell={cell}
+            />
+
+            {game.active && game.status !== 'over' && (
+              <View style={styles.badge} pointerEvents="none">
+                <Text style={styles.badgeText}>{EFFECT_LABEL[game.active.type]}</Text>
+                <View style={styles.badgeTrack}>
+                  <View
+                    style={[
+                      styles.badgeFill,
+                      {
+                        width: `${Math.max(
+                          0,
+                          Math.min(100, (game.active.ticksLeft / EFFECT_DURATION[game.active.type]) * 100),
+                        )}%`,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+            )}
 
             {game.status !== 'running' && (
               <View style={styles.overlay} pointerEvents="none">
@@ -360,6 +403,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 1,
+  },
+  badge: {
+    position: 'absolute',
+    top: 6,
+    alignSelf: 'center',
+    minWidth: 110,
+    backgroundColor: LCD.dark,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignItems: 'center',
+    gap: 3,
+  },
+  badgeText: {
+    color: LCD.pale,
+    fontFamily: MONO,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  badgeTrack: {
+    alignSelf: 'stretch',
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: LCD.mid,
+    overflow: 'hidden',
+  },
+  badgeFill: {
+    height: 4,
+    backgroundColor: LCD.pale,
   },
   brand: {
     marginTop: 10,
